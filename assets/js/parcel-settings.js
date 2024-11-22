@@ -1,11 +1,10 @@
 jQuery(document).ready(function ($) {
   const parcelInput = $(
     'input[name="woocommerce_urgentcargus_courier_parcel_types"]'
-  ); // Câmpul hidden pentru salvarea datelor
-  console.log("Input parcel ", parcelInput.val());
-  const parcelContainer = $("#parcel-settings"); // Container pentru toate tabelele
+  );
 
-  // Funcția de a genera un tabel pentru un colet
+  const parcelContainer = $("#parcel-settings");
+
   function addParcel(
     parcel = { name: "", length: "", width: "", height: "", max_weight: "" }
   ) {
@@ -58,24 +57,19 @@ jQuery(document).ready(function ($) {
     parcelContainer.append(table);
   }
 
-  // Load existing parcels
   const savedParcels = JSON.parse(parcelInput.val() || "[]");
   savedParcels.forEach(addParcel);
 
-  // Adaugă un colet nou
   $("#add-parcel").on("click", function () {
     addParcel();
   });
 
-  // Șterge un tabel/colet
   parcelContainer.on("click", ".remove-parcel", function () {
     $(this).closest("table").remove();
     saveParcels();
   });
 
-  // Salvăm toate coletele
   function saveParcels() {
-    console.log("Se modifica");
     const parcels = [];
     parcelContainer.find("table").each(function () {
       parcels.push({
@@ -89,6 +83,5 @@ jQuery(document).ready(function ($) {
     parcelInput.val(JSON.stringify(parcels));
   }
 
-  // Salvează automat când se modifică
   parcelContainer.on("change", "input", saveParcels);
 });
