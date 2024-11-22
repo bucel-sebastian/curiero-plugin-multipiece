@@ -8,6 +8,7 @@ class Cargus_Shipping_Method_Multipiece
         add_filter('curiero_awb_details', [$this, 'modify_awb_details'], 10, 3);
         add_filter('curiero_awb_details_overwrite', [$this, 'modify_awb_details_overwrite'], 10, 3);
 
+        add_filter('wc_get_template', [$this, 'modify_awb_page_template'], 10, 5);
         add_filter('woocommerce_settings_api_form_fields_urgentcargus_courier', [$this, 'add_multipiece_settings_form_fields']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_scripts']);
     }
@@ -50,7 +51,7 @@ class Cargus_Shipping_Method_Multipiece
         $shipping_method_parcel_types_encoded =  $shipping_method->get_option('parcel_types');
         $shipping_method_parcel_types = json_decode($shipping_method_parcel_types_encoded);
 
-        if (sizeof($shipping_method_parcel_types) !== 0) {
+        if (count($shipping_method_parcel_types) !== 0) {
             usort($shipping_method_parcel_types, function ($a, $b) {
                 return $b->max_weight - $a->max_weight;
             });
@@ -148,5 +149,29 @@ class Cargus_Shipping_Method_Multipiece
         $order = wc_get_order($order_id);
 
         return $this->modify_awb_details($awbDetails, $public_name, $order);
+    }
+
+    public function modify_awb_page_template($template, $template_name, $args, $template_path, $default_path)
+    {
+        if ($template_name === 'templates/generate_awb_page.php' && $args['courier_name'] === 'Cargus') {
+            $shipping_method = WC()->shipping->get_shipping_methods()['urgentcargus_courier'];
+
+            $shipping_method_parcel_types_encoded =  $shipping_method->get_option('parcel_types');
+            $shipping_method_parcel_types = json_decode($shipping_method_parcel_types_encoded);
+
+            if (count($shipping_method_parcel_types) > 0) {
+                wc_get_template(
+                    'templates/generate_awb_page_multipiece.php',
+                    $args,
+                    'includes/',
+                    plugin_dir_path(__FILE__)
+                );
+
+                return false;
+            } else {
+                return $template;
+            }
+        }
+        return $template;
     }
 }
