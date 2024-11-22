@@ -6,6 +6,7 @@ class Cargus_Shipping_Method_Multipiece
     function __construct()
     {
         add_filter('curiero_awb_details', [$this, 'modify_awb_details'], 10, 3);
+        add_filter('curiero_awb_details_overwrite', [$this, 'modify_awb_details_overwrite'], 10, 3);
 
         add_filter('woocommerce_settings_api_form_fields_urgentcargus_courier', [$this, 'add_multipiece_settings_form_fields']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_scripts']);
@@ -136,5 +137,16 @@ class Cargus_Shipping_Method_Multipiece
         }
 
         return $awbDetails;
+    }
+
+    public function modify_awb_details_overwrite($awbDetails, $public_name, $order_id)
+    {
+        if ($public_name !== 'Cargus') {
+            return $awbDetails;
+        }
+
+        $order = wc_get_order($order_id);
+
+        return $this->modify_awb_details($awbDetails, $public_name, $order);
     }
 }
