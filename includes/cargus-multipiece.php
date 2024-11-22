@@ -35,6 +35,16 @@ class Cargus_Shipping_Method_Multipiece
         wp_enqueue_script('parcel-settings-script', CURIERO_MULTIPIECE_PLUGIN_URL . 'assets/js/parcel-settings.js', ['jquery'], '1.0', true);
     }
 
+    public function add_product_to_parcel(array $products, array $parcels, int $parcel_index, float $remaining_weight)
+    {
+        $dif_parcel_products = $remaining_weight - $parcels[$parcel_index]->max_weight;
+        
+        $dif_parcels = $parcels[$parcel_index]->max_weight - $parcels[$parcel_index - 1]->max_weight;
+        foreach($products as $product) {
+
+        }
+    }
+
     public function modify_awb_details($awbDetails, $public_name, $order)
     {
         if ($public_name !== 'Cargus') {
@@ -86,8 +96,11 @@ class Cargus_Shipping_Method_Multipiece
                     }
                 }
 
-                foreach ($shipping_method_parcel_types as $parcel_type) {
-                    $numar_colete_tip = floor($remaining_weight / $parcel_type->max_weight);
+                foreach ($shipping_method_parcel_types as $index => $parcel_type) {
+
+
+                    $numar_colete_tip = ceil($remaining_weight / $parcel_type->max_weight);
+
                     $remaining_weight_in_parcel_type = $numar_colete_tip * $parcel_type->max_weight;
 
                     if ((int) $numar_colete_tip === 0 && (float) $remaining_weight <= (float) $parcel_type->max_weight) {
@@ -112,6 +125,8 @@ class Cargus_Shipping_Method_Multipiece
                                 $remaining_weight_in_parcel -= $quantity_in_parcel * $product['weight'];
                                 $remaining_weight_in_parcel_type -= $quantity_in_parcel * $product['weight'];
 
+                                error_log()
+
                                 if ($remaining_weight_in_parcel === 0) {
                                     break;
                                 }
@@ -126,8 +141,8 @@ class Cargus_Shipping_Method_Multipiece
                             ];
                         }
                     }
-
                     $remaining_weight -= $numar_colete_tip * $parcel_type->max_weight - $remaining_weight_in_parcel_type;
+                    error_log('Nr colete - ' . $numar_colete_tip . " greutate ramasa - " . $remaining_weight);
                 }
 
                 $numar_colete = count($colete_parcel_codes);
