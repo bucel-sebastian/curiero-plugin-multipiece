@@ -1,6 +1,5 @@
 <?php
 
-
 class Cargus_Shipping_Method_Multipiece
 {
     function __construct()
@@ -33,16 +32,6 @@ class Cargus_Shipping_Method_Multipiece
     public function enqueue_scripts()
     {
         wp_enqueue_script('parcel-settings-script', CURIERO_MULTIPIECE_PLUGIN_URL . 'assets/js/parcel-settings.js', ['jquery'], '1.0', true);
-    }
-
-    public function add_product_to_parcel(array $products, array $parcels, int $parcel_index, float $remaining_weight)
-    {
-        $dif_parcel_products = $remaining_weight - $parcels[$parcel_index]->max_weight;
-        
-        $dif_parcels = $parcels[$parcel_index]->max_weight - $parcels[$parcel_index - 1]->max_weight;
-        foreach($products as $product) {
-
-        }
     }
 
     public function modify_awb_details($awbDetails, $public_name, $order)
@@ -96,53 +85,80 @@ class Cargus_Shipping_Method_Multipiece
                     }
                 }
 
-                foreach ($shipping_method_parcel_types as $index => $parcel_type) {
+                usort($products, function ($a, $b) {
+                    return $b['weight'] - $a['weight'];
+                });
 
+                foreach ($shipping_method_parcel_types as $parcel_index => $parcel_type) {
+                    $parcel_type_max_weight = $parcel_type->max_weight;
+                    $number_of_parcels_of_type = ceil($remaining_weight / $parcel_type_max_weight);
 
-                    $numar_colete_tip = ceil($remaining_weight / $parcel_type->max_weight);
+                    $remaining_weight_in_parcel_type = $parcel_type_max_weight * $number_of_parcels_of_type;
 
-                    $remaining_weight_in_parcel_type = $numar_colete_tip * $parcel_type->max_weight;
+                    $fits_in_smaller_parcel = false;
 
-                    if ((int) $numar_colete_tip === 0 && (float) $remaining_weight <= (float) $parcel_type->max_weight) {
-                        $colete_parcel_codes[] = [
-                            'Code' => "0",
-                            'Type' => 1,
-                            'Length' => $parcel_type->length,
-                            'Width' => $parcel_type->width,
-                            'Height' => $parcel_type->height,
-                            'Weight' => (int) $remaining_weight,
-                        ];
-                        break;
-                    }
-
-                    for ($i = 1; $i <= $numar_colete_tip; $i++) {
+                    for ($i = 1; $i <= $number_of_parcels_of_type; $i++) {
                         $remaining_weight_in_parcel = $parcel_type->max_weight;
 
+                        $products_in_current_parcel = [];
+
                         if (!empty($products)) {
-                            foreach ($products as $product) {
-                                $quantity_in_parcel = floor($remaining_weight_in_parcel / $product['weight']);
+                            foreach ($products as &$product) {
+                                if ((int) $product['quantity'] > 0) {
+                                    $quantity_in_parcel = floor($remaining_weight_in_parcel / $product['weight']);
 
-                                $remaining_weight_in_parcel -= $quantity_in_parcel * $product['weight'];
-                                $remaining_weight_in_parcel_type -= $quantity_in_parcel * $product['weight'];
+                                    if ((int) ($product['quantity'] - $quantity_in_parcel) < 0) {
+                                        $quantity_in_parcel = $product['quantity'];
+                                    }
 
-                                error_log()
+                                    $remaining_weight_in_parcel -= $quantity_in_parcel * $product['weight'];
+                                    $remaining_weight_in_parcel_type -= $quantity_in_parcel * $product['weight'];
 
-                                if ($remaining_weight_in_parcel === 0) {
-                                    break;
+                                    $products_in_current_parcel[] = ['weight' => $product['weight'], 'quantity' => $quantity_in_parcel];
+
+                                    $product['quantity'] -= $quantity_in_parcel;
+                                    if ((int) $remaining_weight_in_parcel === 0) {
+                                        break;
+                                    }
                                 }
                             }
+                        }
+
+                        $parcel_weight = (int) $parcel_type->max_weight - $remaining_weight_in_parcel;
+
+                        if ((int) $i === (int) $number_of_parcels_of_type && isset($shipping_method_parcel_types[$parcel_index + 1])) {
+                            if (
+                                $parcel_weight <= $shipping_method_parcel_types[$parcel_index + 1]->max_weight
+                            ) {
+                                $fits_in_smaller_parcel = true;
+                            }
+                        }
+
+                        if (!$fits_in_smaller_parcel) {
                             $colete_parcel_codes[] = [
                                 'Code' => "0",
                                 'Type' => 1,
                                 'Length' => $parcel_type->length,
                                 'Width' => $parcel_type->width,
                                 'Height' => $parcel_type->height,
-                                'Weight' => (int) $parcel_type->max_weight - $remaining_weight_in_parcel,
+                                'Weight' => $parcel_weight,
                             ];
+                        } else {
+                            foreach ($products_in_current_parcel as $product_in_parcel) {
+                                for ($j = 0; $j < count($products); $j++) {
+                                    if ($products[$j]['weight'] === $product_in_parcel['weight']) {
+                                        $products[$j]['quantity'] += $product_in_parcel['quantity'];
+                                    }
+                                }
+                            }
                         }
                     }
-                    $remaining_weight -= $numar_colete_tip * $parcel_type->max_weight - $remaining_weight_in_parcel_type;
-                    error_log('Nr colete - ' . $numar_colete_tip . " greutate ramasa - " . $remaining_weight);
+
+                    if ($fits_in_smaller_parcel) {
+                        $remaining_weight -= (($number_of_parcels_of_type - 1) * $parcel_type->max_weight);
+                    } else {
+                        $remaining_weight -= ($number_of_parcels_of_type * $parcel_type->max_weight) - $remaining_weight_in_parcel_type;
+                    }
                 }
 
                 $numar_colete = count($colete_parcel_codes);
